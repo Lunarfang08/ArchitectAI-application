@@ -1,0 +1,71 @@
+trigger:
+  branches:
+    include: [main]
+pr:
+  branches:
+    include: [main]
+pool:
+  vmImage: ubuntu-latest
+variables:
+  APP_ENV: test
+  AZURE_INTEGRATIONS_ENABLED: 'false'
+  ANONYMIZED_TELEMETRY: 'False'
+jobs:
+  - job: Backend
+    steps:
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: '3.11'
+      - script: python -m pip install uv==0.9.7
+        displayName: Install uv
+      - script: uv sync --frozen --extra dev
+        workingDirectory: backend
+        displayName: Install locked backend dependencies
+      - script: uv run ruff check .
+        workingDirectory: backend
+        displayName: Backend lint
+      - script: uv run pytest --junitxml=test-results/backend.xml
+        workingDirectory: backend
+        displayName: Backend tests
+      - script: mkdir -p data && uv run alembic upgrade head && uv run alembic check
+        workingDirectory: backend
+        displayName: Verify fresh database migrations
+      - task: PublishTestResults@2
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: JUnit
+          testResultsFiles: backend/test-results/*.xml
+          failTaskOnFailedTests: true
+  - job: Frontend
+    steps:
+      - task: NodeTool@0
+        inputs:
+          versionSpec: '22.x'
+      - script: npm ci
+        workingDirectory: frontend
+        displayName: Install locked frontend dependencies
+      - script: npm run lint
+        workingDirectory: frontend
+      - script: npm test -- --run --reporter=default --reporter=junit --outputFile=test-results/frontend.xml
+        workingDirectory: frontend
+      - script: npm run build
+        workingDirectory: frontend
+      - task: PublishTestResults@2
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: JUnit
+          testResultsFiles: frontend/test-results/*.xml
+          failTaskOnFailedTests: true
+  - job: Containers
+    dependsOn: [Backend, Frontend]
+    steps:
+      - script: docker compose config --quiet && docker compose build
+        displayName: Validate and build local deployment
+      - script: docker compose up -d --wait --wait-timeout 120
+        displayName: Smoke test containers without a model
+      - script: docker compose logs --no-color
+        condition: failed()
+        displayName: Container diagnostics
+      - script: docker compose down
+        condition: always()
+        displayName: Stop CI containers

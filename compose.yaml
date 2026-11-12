@@ -1,0 +1,57 @@
+name: architect-ai
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      APP_ENV: production
+      FRONTEND_ORIGIN: http://localhost:3000
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:7b}
+      OLLAMA_FALLBACK_MODEL: ${OLLAMA_FALLBACK_MODEL:-qwen2.5:3b}
+      MODEL_MAX_OUTPUT_TOKENS: ${MODEL_MAX_OUTPUT_TOKENS:-4096}
+      OLLAMA_REQUEST_TIMEOUT_SECONDS: ${OLLAMA_REQUEST_TIMEOUT_SECONDS:-600}
+      ARCHITECTURE_GENERATION_TIMEOUT_SECONDS: ${ARCHITECTURE_GENERATION_TIMEOUT_SECONDS:-0}
+      MODEL_PROVIDER: ollama
+      AZURE_INTEGRATIONS_ENABLED: "false"
+      DATABASE_URL: sqlite+aiosqlite:////app/data/architect_ai.db
+      KNOWLEDGE_BASE_DIR: /app/knowledge_base
+      GENERATED_PROJECTS_DIR: /app/generated_projects
+      ANONYMIZED_TELEMETRY: "False"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - database:/app/data
+      - knowledge:/app/knowledge_base
+      - generated:/app/generated_projects
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000/api/v1
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+volumes:
+  database:
+  knowledge:
+  generated:

@@ -1,0 +1,28 @@
+"use client";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import styles from "./product-demo.module.css";
+
+const stages = [
+  ["Brief", "Every system starts with a question.", "Build an inventory platform with live stock updates, secure checkout, and a dashboard for our team."],
+  ["Design", "A clear direction from your brief.", "Your requirements and project context shape a system design with clear boundaries and decisions."],
+  ["Model", "The idea becomes a system.", "A dashboard, order API, event queue, and database—connected by deliberate architectural choices."],
+  ["Build", "Inspect the work before it lands.", "A complete file manifest, ready for your review. You decide when files are written."],
+  ["Stress", "What if tomorrow brings 20× traffic?", "Future Lab explores the pressure before the launch. Follow the predicted failure through the system."],
+  ["Discover", "Find the first domino.", "Database connections saturate. Orders wait. Retries amplify the load. The impact spreads."],
+  ["Repair", "Give the system a way through.", "Queue incoming work, cap retries with circuit breakers, and protect orders with idempotency keys."],
+  ["Evolve", "A stronger blueprint for tomorrow.", "Review the proposed changes. Keep the reasoning. Build with a clearer understanding of the risks."],
+];
+export function ProductDemo() {
+  const [stage, setStage] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const [visible, setVisible] = useState(false);
+  const [tab, setTab] = useState(true);
+  const root = useRef<HTMLElement>(null);
+  useEffect(() => { const node = root.current; if (!node) return; const observer = typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(entries => setVisible(entries[0].isIntersecting), { threshold: .15 }) : null; observer?.observe(node); const change = () => setTab(!document.hidden); document.addEventListener("visibilitychange", change); return () => { observer?.disconnect(); document.removeEventListener("visibilitychange", change); }; }, []);
+  useEffect(() => { if (!playing || !visible || !tab) return; const timer = setTimeout(() => setStage(s => (s + 1) % stages.length), stage === 5 ? 4500 : 3500); return () => clearTimeout(timer); }, [playing, visible, tab, stage]);
+  function choose(i: number) { setStage(i); setPlaying(false); }
+  return <section ref={root} className={styles.demo} id="demo" aria-label="Interactive product demo"><header><p>PRODUCT WALKTHROUGH</p><h2>From brief to <em>blueprint.</em></h2><span>Explore an example project from start to review.</span></header><div className={styles.window}><div className={styles.chrome}><span><i /><i /><i /></span><b>INVENTORY PLATFORM / PROJECT WALKTHROUGH</b><small>ILLUSTRATIVE EXAMPLE</small></div><div className={styles.body}><aside><span>INVENTORY PLATFORM</span>{stages.map(([label], i) => <button key={label} type="button" aria-current={stage === i ? "step" : undefined} onClick={() => choose(i)}>{label}<i>{i < stage ? "✓" : i === stage ? "↗" : "·"}</i></button>)}</aside><div className={styles.canvas} data-stage={stage}><div className={styles.stageLabel}>{stages[stage][0].toUpperCase()}</div><h3>{stages[stage][1]}</h3><p className={styles.explanation}>{stages[stage][2]}</p><div className={styles.scene} key={stage}>
+      {stage === 0 ? <div className={styles.brief}><span>PROJECT REQUIREMENT</span><p>{stages[0][2]}</p><b>Generate architecture ↗</b></div> : stage === 1 ? <div className={styles.agents}><div><i>◇</i><strong>Architecture</strong><span>Clarify scope and constraints</span><b>● Ready</b></div><div><i>◇</i><strong>Knowledge</strong><span>Use relevant project context</span><b>● Ready</b></div><div><i>◇</i><strong>Review</strong><span>Check risks and test coverage</span><b>● Ready</b></div></div> : stage === 3 ? <div className={styles.files}><span>PROPOSED FILES</span>{["README.md", "frontend/app/page.tsx", "backend/app/orders.py", "backend/app/inventory.py", "tests/test_orders.py"].map(f => <div key={f}>◇ <code>{f}</code><small>proposed</small></div>)}<b>Review before writing</b></div> : <div className={styles.system}><svg viewBox="0 0 600 220" aria-hidden="true"><path d="M100 110H300M300 110L500 40M300 110L500 180" /></svg>{["Dashboard", "Order API", "Event queue", "PostgreSQL"].map((name, i) => <div key={name} className={`${styles.node} ${styles[`node${i}`]}`} data-failed={stage === 5 && (i === 1 || i === 3)}><span>{["▤", "⌘", "≋", "◉"][i]}</span><strong>{name}</strong><small>{stage === 5 && (i === 1 || i === 3) ? "Overloaded" : stage >= 6 ? "Protected" : "Connected"}</small></div>)}{stage === 4 && <b className={styles.overlay}>↗ INCOMING TRAFFIC ×20</b>}{stage >= 6 && <b className={styles.overlay}>✓ Queueing · Circuit breaker · Idempotency</b>}</div>}
+      {stage === 5 && <div className={styles.metric}><span>ESTIMATED RESILIENCE</span><strong>58<small>/100</small></strong></div>}{stage === 7 && <div className={styles.metric}><span>ESTIMATE AFTER REPAIRS</span><strong>87<small>/100</small></strong><small>Illustrative estimate</small></div>}</div></div></div><footer><div className={styles.controls}><button type="button" onClick={() => setPlaying(!playing)}>{playing ? "Pause" : "Play"}</button><button type="button" onClick={() => { setStage(0); setPlaying(false); }}>Replay</button></div><div className={styles.progress}>{stages.map(([label], i) => <button type="button" aria-label={`Show ${label}`} aria-pressed={stage === i} key={label} onClick={() => choose(i)} />)}</div></footer></div><div className={styles.cta}><p>Your idea deserves its own story.</p><Link href="/workspace">Try your own requirement ↗</Link></div></section>;
+}
